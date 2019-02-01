@@ -106,3 +106,5 @@ ENV/
 # App, Exe
 *.app
 *.exe
+*.x86_64
+Reacher_Data/
