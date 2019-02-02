@@ -13,6 +13,7 @@ We will introduce to solve simple continuous control problem by Deep Reinforceme
 * Read the most famous [blog post](http://karpathy.github.io/2016/05/31/rl/) on policy gradient methods.
 * Implement a policy gradient method to win at Pong in this [Medium post](https://medium.com/@dhruvp/how-to-write-a-neural-network-to-play-pong-from-scratch-956b57d4f6e0).
 * Learn more about [evolution strategies](https://blog.openai.com/evolution-strategies/) from OpenAI.
+
 #### Technical things
 * Read about Deep Learnming with PyTorch : https://github.com/udacity/DL_PyTorch
 
@@ -25,6 +26,7 @@ We will introduce to solve simple continuous control problem by Deep Reinforceme
 * Read [A2C - Open AI Baseline Blog post](https://blog.openai.com/baselines-acktr-a2c/).
 * Read [GAE paper](https://arxiv.org/abs/1506.02438).
 * Read [DDPG paper](https://arxiv.org/abs/1509.02971).
+
 #### Technical things
 * Check about Deep Reinforcement Learnming GitHub with PyTorch by Shangtong Zhang  : https://github.com/ShangtongZhang/DeepRL
 
@@ -147,4 +149,63 @@ jupyter notebook
 7. Before running code in a notebook, change the kernel to match the drlnd environment by using the drop-down Kernel menu.
 ![Jupyter Notebbok Kernel Setting](assets/jupyter_notebook_kernel_menu.png)
 8. Click **Report.ipynb** on root directory for "Version 1: One (1) Agent"
+![Version1_Score](assets/version1_score_plt.png)
+<p align="center">
+Picture 3 - Reacher-Single Agent - Score Plot
+</p>
 9. Click **Report-Version2.ipynb** on root directory for "Version 2: Twenty (20) Agents"
+![Version2_Score](assets/version2_score_plt.png)
+<p align="center">
+Picture 4 - Reacher-Distributed Agents - Score Plot
+</p>
+
+---
+
+### Benchmark Implementation
+
+In case you get stuck, refer to the details of one approach that worked well.
+
+#### Attempt 1
+The first thing that we did was amend the DDPG code to work for multiple agents, to solve version 2 of the environment. The DDPG code in the DRLND GitHub repository utilizes only a single agent, and with each step:
+
+* the agent adds its experience to the replay buffer, and
+* the (local) actor and critic networks are updated, using a sample from the replay buffer.
+
+So, in order to make the code work with 20 agents, we modified the code so that after each step:
+* each agent adds its experience to a replay buffer that is shared by all agents, and
+* the (local) actor and critic networks are updated 20 times in a row (one for each agent), using 20 different samples from the replay buffer.
+In hindsight, this wasn't a great plan, but it was a start! That said, the scores are shown below.
+
+![benchmark-attempt1](assets/benchmark-attempt1.png)
+
+You'll notice that we made some rapid improvement pretty early in training, because of the extremely large number of updates. Unfortunately, also due to the large number of updates, the agent is incredibly unstable. Around episode 100, performance crashed and did not recover.
+
+So, we focused on determining ways to stabilize this first attempt.
+
+#### Attempt 2
+For this second attempt, we reduced the number of agents from 20 to 1 (by switching to version 1 of the environment). We wanted to know how much stability we could expect from a single agent. The idea was that the code would likely train more reliably, if we didn't make so many updates. And it did train much better.
+
+![benchmark-attempt2](assets/benchmark-attempt2.png)
+
+At one point, we even hit the target score of 30. However, this score wasn't maintained for very long, and we saw strong indications that the algorithm was going to crash again. This showed us that we needed to spend more time with figuring out how to stabilize the algorithm, if we wanted to have a chance of training all 20 agents simultaneously.
+
+#### Attempt 3
+This time, we switched back to version 2 of the environment, and began with the code from Attempt 1 as a starting point. Then, the only change we made was to use gradient clipping when training the critic network. The corresponding snippet of code was as follows:
+```
+self.critic_optimizer.zero_grad()
+critic_loss.backward()
+torch.nn.utils.clip_grad_norm(self.critic_local.parameters(), 1)
+self.critic_optimizer.step()
+```
+The corresponding scores are plotted below.
+
+![benchmark-attempt3](assets/benchmark-attempt3.png)
+
+This is when we really started to feel hopeful. We still didn't maintain an average score of 30 over 100 episodes, but we maintained the score for longer than before. And the agent didn't crash as suddenly as in the previous attempts!
+
+#### Attempt 4
+At this point, we decided to get less aggressive with the number of updates per time step. In particular, instead of updating the actor and critic networks 20 times at every timestep, we amended the code to update the networks 10 times after every 20 timesteps. The corresponding scores are plotted below.
+
+![benchmark-attempt4](assets/benchmark-attempt4.png)
+
+And, this was enough to solve the environment! In hindsight, we probably should have realized this fix much earlier, but this long path to the solution was definitely a nice way to help with building intuition! 
